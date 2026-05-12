@@ -42,9 +42,6 @@ spec:
     tty: true
   - name: kubectl
     image: bitnami/kubectl:latest
-    env:
-    - name: SHELL
-      value: /bin/sh
     command: [cat]
     tty: true
   volumes:
