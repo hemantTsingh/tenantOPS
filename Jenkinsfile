@@ -60,6 +60,7 @@ spec:
                 echo '========== Checking out source code =========='
                 checkout scm
                 script {
+                    sh 'git config --global --add safe.directory $PWD'
                     env.GIT_COMMIT_SHORT = sh(
                         script: "git rev-parse --short HEAD",
                         returnStdout: true
@@ -221,7 +222,7 @@ spec:
             container('docker') {
                 sh 'docker logout || true'
             }
-            cleanWs()
+            deleteDir()
         }
     }
 }
