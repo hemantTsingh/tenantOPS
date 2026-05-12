@@ -1,0 +1,23 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tenantops
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/hemantTsingh/tenantOPS
+    targetRevision: main
+    path: helm/tenant-stack
+    helm:
+      valueFiles:
+        - values.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tenantops
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

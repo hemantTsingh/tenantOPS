@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tenantops-collector
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.collector.replicas }}
+  selector:
+    matchLabels:
+      app: tenantops-collector
+  template:
+    metadata:
+      labels:
+        app: tenantops-collector
+    spec:
+      containers:
+        - name: collector
+          image: {{ .Values.collector.image }}:{{ .Values.collector.tag }}
+          env:
+            - name: API_URL
+              value: "http://tenantops-api:4000"

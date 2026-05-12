@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: tenantops-api
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: tenantops-api
+  ports:
+    - port: {{ .Values.api.service.port }}
+      targetPort: {{ .Values.api.port }}

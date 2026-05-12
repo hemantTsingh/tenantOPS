@@ -1,0 +1,41 @@
+namespace: tenantops
+
+frontend:
+  image: hemantsingh1023/tenantops-frontend
+  tag: v1.1
+  replicas: 2
+  port: 80
+  service:
+    type: LoadBalancer
+    port: 80
+
+api:
+  image: hemantsingh1023/tenantops-api
+  tag: v1.1
+  replicas: 2
+  port: 4000
+  service:
+    type: ClusterIP
+    port: 4000
+  env:
+    JWT_SECRET: "tenantops-jwt-secret-2026"
+    DB_HOST: "tenantops-db"
+    DB_PORT: "5432"
+    DB_NAME: "tenantops"
+    DB_USER: "tenantops"
+    DB_PASS: "TenantOPS2026!!"
+
+collector:
+  image: hemantsingh1023/tenantops-collector
+  tag: v1.1
+  replicas: 1
+
+db:
+  image: postgres
+  tag: "15-alpine"
+  port: 5432
+  storage: 10Gi
+  env:
+    POSTGRES_DB: "tenantops"
+    POSTGRES_USER: "tenantops"
+    POSTGRES_PASSWORD: "TenantOPS2026!!"

@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tenantops-api
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      app: tenantops-api
+  template:
+    metadata:
+      labels:
+        app: tenantops-api
+    spec:
+      containers:
+        - name: tenant-api
+          image: {{ .Values.api.image }}:{{ .Values.api.tag }}
+          ports:
+            - containerPort: {{ .Values.api.port }}
+          env:
+            - name: JWT_SECRET
+              value: "{{ .Values.api.env.JWT_SECRET }}"
+            - name: DB_HOST
+              value: "{{ .Values.api.env.DB_HOST }}"
+            - name: DB_PORT
+              value: "{{ .Values.api.env.DB_PORT }}"
+            - name: DB_NAME
+              value: "{{ .Values.api.env.DB_NAME }}"
+            - name: DB_USER
+              value: "{{ .Values.api.env.DB_USER }}"
+            - name: DB_PASSWORD
+              value: "{{ .Values.api.env.DB_PASS }}"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4000
+            initialDelaySeconds: 10
+            periodSeconds: 5
