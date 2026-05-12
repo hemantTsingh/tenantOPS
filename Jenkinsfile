@@ -11,7 +11,21 @@ metadata:
 spec:
   serviceAccountName: jenkins
   containers:
-  - name: kaniko
+  - name: kaniko-frontend
+    image: gcr.io/kaniko-project/executor:debug
+    command: [sleep]
+    args: ['9999999']
+    volumeMounts:
+    - name: docker-config
+      mountPath: /kaniko/.docker
+  - name: kaniko-api
+    image: gcr.io/kaniko-project/executor:debug
+    command: [sleep]
+    args: ['9999999']
+    volumeMounts:
+    - name: docker-config
+      mountPath: /kaniko/.docker
+  - name: kaniko-collector
     image: gcr.io/kaniko-project/executor:debug
     command: [sleep]
     args: ['9999999']
@@ -76,62 +90,58 @@ spec:
             }
         }
 
-        stage('Build Frontend') {
-            steps {
-                container('kaniko') {
-                    echo '=========================================='
-                    echo '  Stage 2a: Build Frontend Image'
-                    echo '=========================================='
-                    sh """
-                        /kaniko/executor \
-                            --context=${WORKSPACE}/services/frontend \
-                            --dockerfile=${WORKSPACE}/services/frontend/Dockerfile \
-                            --destination=${DOCKERHUB_USER}/tenantops-frontend:${IMAGE_TAG} \
-                            --destination=${DOCKERHUB_USER}/tenantops-frontend:latest \
-                            --cache=true \
-                            --cache-ttl=24h \
-                            --snapshot-mode=redo
-                    """
+        stage('Build Images') {
+            parallel {
+                stage('Frontend') {
+                    steps {
+                        container('kaniko-frontend') {
+                            echo '===== Building Frontend ====='
+                            sh """
+                                /kaniko/executor \
+                                    --context=${WORKSPACE}/services/frontend \
+                                    --dockerfile=${WORKSPACE}/services/frontend/Dockerfile \
+                                    --destination=${DOCKERHUB_USER}/tenantops-frontend:${IMAGE_TAG} \
+                                    --destination=${DOCKERHUB_USER}/tenantops-frontend:latest \
+                                    --cache=true \
+                                    --cache-ttl=24h \
+                                    --snapshot-mode=redo
+                            """
+                        }
+                    }
                 }
-            }
-        }
-
-        stage('Build API') {
-            steps {
-                container('kaniko') {
-                    echo '=========================================='
-                    echo '  Stage 2b: Build API Image'
-                    echo '=========================================='
-                    sh """
-                        /kaniko/executor \
-                            --context=${WORKSPACE}/services/tenant-api \
-                            --dockerfile=${WORKSPACE}/services/tenant-api/Dockerfile \
-                            --destination=${DOCKERHUB_USER}/tenantops-api:${IMAGE_TAG} \
-                            --destination=${DOCKERHUB_USER}/tenantops-api:latest \
-                            --cache=true \
-                            --cache-ttl=24h \
-                            --snapshot-mode=redo
-                    """
+                stage('API') {
+                    steps {
+                        container('kaniko-api') {
+                            echo '===== Building API ====='
+                            sh """
+                                /kaniko/executor \
+                                    --context=${WORKSPACE}/services/tenant-api \
+                                    --dockerfile=${WORKSPACE}/services/tenant-api/Dockerfile \
+                                    --destination=${DOCKERHUB_USER}/tenantops-api:${IMAGE_TAG} \
+                                    --destination=${DOCKERHUB_USER}/tenantops-api:latest \
+                                    --cache=true \
+                                    --cache-ttl=24h \
+                                    --snapshot-mode=redo
+                            """
+                        }
+                    }
                 }
-            }
-        }
-
-        stage('Build Collector') {
-            steps {
-                container('kaniko') {
-                    echo '=========================================='
-                    echo '  Stage 2c: Build Collector Image'
-                    echo '=========================================='
-                    sh """
-                        /kaniko/executor \
-                            --context=${WORKSPACE}/services/metrics-collector \
-                            --dockerfile=${WORKSPACE}/services/metrics-collector/Dockerfile \
-                            --destination=${DOCKERHUB_USER}/tenantops-collector:${IMAGE_TAG} \
-                            --destination=${DOCKERHUB_USER}/tenantops-collector:latest \
-                            --cache=true \
-                            --cache-ttl=24h \
-                            --snapshot-mode=redo
-                    """
+                stage('Collector') {
+                    steps {
+                        container('kaniko-collector') {
+                            echo '===== Building Collector ====='
+                            sh """
+                                /kaniko/executor \
+                                    --context=${WORKSPACE}/services/metrics-collector \
+                                    --dockerfile=${WORKSPACE}/services/metrics-collector/Dockerfile \
+                                    --destination=${DOCKERHUB_USER}/tenantops-collector:${IMAGE_TAG} \
+                                    --destination=${DOCKERHUB_USER}/tenantops-collector:latest \
+                                    --cache=true \
+                                    --cache-ttl=24h \
+                                    --snapshot-mode=redo
+                            """
+                        }
+                    }
                 }
             }
         }
