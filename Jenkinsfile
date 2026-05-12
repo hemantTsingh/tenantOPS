@@ -206,24 +206,10 @@ spec:
 
         stage('Verify') {
             steps {
-                container('kubectl') {
-                    echo '=========================================='
-                    echo '  Stage 5: Verify Deployment'
-                    echo '=========================================='
-                    sh """
-                        kubectl rollout status deployment/tenantops-frontend -n ${K8S_NAMESPACE} --timeout=3m
-                        kubectl rollout status deployment/tenantops-api -n ${K8S_NAMESPACE} --timeout=3m
-                        kubectl rollout status deployment/tenantops-collector -n ${K8S_NAMESPACE} --timeout=3m
-                        echo ''
-                        echo '=== Pod Status ==='
-                        kubectl get pods -n ${K8S_NAMESPACE} -o wide
-                        echo ''
-                        echo '=== Services ==='
-                        kubectl get svc -n ${K8S_NAMESPACE}
-                        echo ''
-                        echo '=== Deployed Images ==='
-                        kubectl get pods -n ${K8S_NAMESPACE} -o jsonpath='{range .items[*]}{.metadata.name}{": "}{range .spec.containers[*]}{.image}{" "}{end}{"\n"}{end}'
-                    """
+                container('helm') {
+                    echo 'Stage 5: Verify Deployment'
+                    sh 'helm status tenantops -n tenantops'
+                    sh 'helm history tenantops -n tenantops'
                 }
             }
         }
