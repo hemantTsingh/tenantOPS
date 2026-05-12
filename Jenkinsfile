@@ -51,7 +51,7 @@ spec:
 
     options {
         buildDiscarder(logRotator(numToKeepStr: '10'))
-        timeout(time: 45, unit: 'MINUTES')
+        timeout(time: 60, unit: 'MINUTES')
         disableConcurrentBuilds()
     }
 
@@ -60,7 +60,7 @@ spec:
         stage('Checkout') {
             steps {
                 echo '=========================================='
-                echo '  Stage 1: Checkout Source Code'
+                echo '  Stage 1: Checkout'
                 echo '=========================================='
                 checkout scm
                 script {
@@ -69,133 +69,104 @@ spec:
                     env.GIT_AUTHOR  = sh(script: 'git log -1 --pretty=%an', returnStdout: true).trim()
                     env.GIT_MESSAGE = sh(script: 'git log -1 --pretty=%s', returnStdout: true).trim()
                     env.IMAGE_TAG   = "v${BUILD_NUMBER}-${env.GIT_SHORT}"
-                    echo "Image Tag  : ${env.IMAGE_TAG}"
-                    echo "Author     : ${env.GIT_AUTHOR}"
-                    echo "Commit     : ${env.GIT_MESSAGE}"
+                    echo "Image Tag : ${env.IMAGE_TAG}"
+                    echo "Author    : ${env.GIT_AUTHOR}"
+                    echo "Commit    : ${env.GIT_MESSAGE}"
                 }
             }
         }
 
-        stage('Build Images') {
-            parallel {
-                stage('Build Frontend') {
-                    steps {
-                        container('kaniko') {
-                            echo '=========================================='
-                            echo '  Building Frontend Image'
-                            echo '=========================================='
-                            sh """
-                                /kaniko/executor \
-                                    --context=${WORKSPACE}/services/frontend \
-                                    --dockerfile=${WORKSPACE}/services/frontend/Dockerfile \
-                                    --destination=${DOCKERHUB_USER}/tenantops-frontend:${IMAGE_TAG} \
-                                    --destination=${DOCKERHUB_USER}/tenantops-frontend:latest \
-                                    --cache=true \
-                                    --cache-ttl=24h \
-                                    --compressed-caching=false \
-                                    --snapshot-mode=redo
-                            """
-                        }
-                    }
+        stage('Build Frontend') {
+            steps {
+                container('kaniko') {
+                    echo '=========================================='
+                    echo '  Stage 2a: Build Frontend Image'
+                    echo '=========================================='
+                    sh """
+                        /kaniko/executor \
+                            --context=${WORKSPACE}/services/frontend \
+                            --dockerfile=${WORKSPACE}/services/frontend/Dockerfile \
+                            --destination=${DOCKERHUB_USER}/tenantops-frontend:${IMAGE_TAG} \
+                            --destination=${DOCKERHUB_USER}/tenantops-frontend:latest \
+                            --cache=true \
+                            --cache-ttl=24h \
+                            --snapshot-mode=redo
+                    """
                 }
-                stage('Build API') {
-                    steps {
-                        container('kaniko') {
-                            echo '=========================================='
-                            echo '  Building API Image'
-                            echo '=========================================='
-                            sh """
-                                /kaniko/executor \
-                                    --context=${WORKSPACE}/services/tenant-api \
-                                    --dockerfile=${WORKSPACE}/services/tenant-api/Dockerfile \
-                                    --destination=${DOCKERHUB_USER}/tenantops-api:${IMAGE_TAG} \
-                                    --destination=${DOCKERHUB_USER}/tenantops-api:latest \
-                                    --cache=true \
-                                    --cache-ttl=24h \
-                                    --compressed-caching=false \
-                                    --snapshot-mode=redo
-                            """
-                        }
-                    }
+            }
+        }
+
+        stage('Build API') {
+            steps {
+                container('kaniko') {
+                    echo '=========================================='
+                    echo '  Stage 2b: Build API Image'
+                    echo '=========================================='
+                    sh """
+                        /kaniko/executor \
+                            --context=${WORKSPACE}/services/tenant-api \
+                            --dockerfile=${WORKSPACE}/services/tenant-api/Dockerfile \
+                            --destination=${DOCKERHUB_USER}/tenantops-api:${IMAGE_TAG} \
+                            --destination=${DOCKERHUB_USER}/tenantops-api:latest \
+                            --cache=true \
+                            --cache-ttl=24h \
+                            --snapshot-mode=redo
+                    """
                 }
-                stage('Build Collector') {
-                    steps {
-                        container('kaniko') {
-                            echo '=========================================='
-                            echo '  Building Collector Image'
-                            echo '=========================================='
-                            sh """
-                                /kaniko/executor \
-                                    --context=${WORKSPACE}/services/metrics-collector \
-                                    --dockerfile=${WORKSPACE}/services/metrics-collector/Dockerfile \
-                                    --destination=${DOCKERHUB_USER}/tenantops-collector:${IMAGE_TAG} \
-                                    --destination=${DOCKERHUB_USER}/tenantops-collector:latest \
-                                    --cache=true \
-                                    --cache-ttl=24h \
-                                    --compressed-caching=false \
-                                    --snapshot-mode=redo
-                            """
-                        }
-                    }
+            }
+        }
+
+        stage('Build Collector') {
+            steps {
+                container('kaniko') {
+                    echo '=========================================='
+                    echo '  Stage 2c: Build Collector Image'
+                    echo '=========================================='
+                    sh """
+                        /kaniko/executor \
+                            --context=${WORKSPACE}/services/metrics-collector \
+                            --dockerfile=${WORKSPACE}/services/metrics-collector/Dockerfile \
+                            --destination=${DOCKERHUB_USER}/tenantops-collector:${IMAGE_TAG} \
+                            --destination=${DOCKERHUB_USER}/tenantops-collector:latest \
+                            --cache=true \
+                            --cache-ttl=24h \
+                            --snapshot-mode=redo
+                    """
                 }
             }
         }
 
         stage('Security Scan (Trivy)') {
-            parallel {
-                stage('Scan Frontend') {
-                    steps {
-                        container('trivy') {
-                            echo '=========================================='
-                            echo '  Security Scan: Frontend'
-                            echo '=========================================='
-                            sh """
-                                trivy image \
-                                    --exit-code 0 \
-                                    --severity HIGH,CRITICAL \
-                                    --no-progress \
-                                    --format table \
-                                    ${DOCKERHUB_USER}/tenantops-frontend:${IMAGE_TAG} \
-                                    || true
-                            """
-                        }
-                    }
-                }
-                stage('Scan API') {
-                    steps {
-                        container('trivy') {
-                            echo '=========================================='
-                            echo '  Security Scan: API'
-                            echo '=========================================='
-                            sh """
-                                trivy image \
-                                    --exit-code 0 \
-                                    --severity HIGH,CRITICAL \
-                                    --no-progress \
-                                    --format table \
-                                    ${DOCKERHUB_USER}/tenantops-api:${IMAGE_TAG} \
-                                    || true
-                            """
-                        }
-                    }
-                }
-                stage('Scan Collector') {
-                    steps {
-                        container('trivy') {
-                            echo '=========================================='
-                            echo '  Security Scan: Collector'
-                            echo '=========================================='
-                            sh """
-                                trivy image \
-                                    --exit-code 0 \
-                                    --severity HIGH,CRITICAL \
-                                    --no-progress \
-                                    --format table \
-                                    ${DOCKERHUB_USER}/tenantops-collector:${IMAGE_TAG} \
-                                    || true
-                            """
-                        }
-                    }
+            steps {
+                container('trivy') {
+                    echo '=========================================='
+                    echo '  Stage 3: Security Scan with Trivy'
+                    echo '=========================================='
+                    sh """
+                        echo '--- Scanning Frontend ---'
+                        trivy image \
+                            --exit-code 0 \
+                            --severity HIGH,CRITICAL \
+                            --no-progress \
+                            --format table \
+                            ${DOCKERHUB_USER}/tenantops-frontend:${IMAGE_TAG} || true
+
+                        echo '--- Scanning API ---'
+                        trivy image \
+                            --exit-code 0 \
+                            --severity HIGH,CRITICAL \
+                            --no-progress \
+                            --format table \
+                            ${DOCKERHUB_USER}/tenantops-api:${IMAGE_TAG} || true
+
+                        echo '--- Scanning Collector ---'
+                        trivy image \
+                            --exit-code 0 \
+                            --severity HIGH,CRITICAL \
+                            --no-progress \
+                            --format table \
+                            ${DOCKERHUB_USER}/tenantops-collector:${IMAGE_TAG} || true
+                    """
                 }
             }
         }
@@ -223,28 +194,24 @@ spec:
             }
         }
 
-        stage('Verify Deployment') {
+        stage('Verify') {
             steps {
                 container('kubectl') {
                     echo '=========================================='
-                    echo '  Stage 5: Verify Deployment Health'
+                    echo '  Stage 5: Verify Deployment'
                     echo '=========================================='
                     sh """
-                        echo '--- Rollout Status ---'
                         kubectl rollout status deployment/tenantops-frontend -n ${K8S_NAMESPACE} --timeout=3m
                         kubectl rollout status deployment/tenantops-api -n ${K8S_NAMESPACE} --timeout=3m
                         kubectl rollout status deployment/tenantops-collector -n ${K8S_NAMESPACE} --timeout=3m
-
                         echo ''
-                        echo '--- Pod Status ---'
+                        echo '=== Pod Status ==='
                         kubectl get pods -n ${K8S_NAMESPACE} -o wide
-
                         echo ''
-                        echo '--- Services ---'
+                        echo '=== Services ==='
                         kubectl get svc -n ${K8S_NAMESPACE}
-
                         echo ''
-                        echo '--- Image Tags Deployed ---'
+                        echo '=== Deployed Images ==='
                         kubectl get pods -n ${K8S_NAMESPACE} -o jsonpath='{range .items[*]}{.metadata.name}{": "}{range .spec.containers[*]}{.image}{" "}{end}{"\n"}{end}'
                     """
                 }
@@ -260,8 +227,8 @@ spec:
              Build     : #${BUILD_NUMBER}
              Image Tag : ${IMAGE_TAG}
              Namespace : ${K8S_NAMESPACE}
-             Commit    : ${GIT_SHORT} by ${GIT_AUTHOR}
-             Message   : ${GIT_MESSAGE}
+             Author    : ${GIT_AUTHOR}
+             Commit    : ${GIT_MESSAGE}
             ============================================
             """
         }
@@ -271,12 +238,12 @@ spec:
              DEPLOYMENT FAILED
              Build     : #${BUILD_NUMBER}
              Image Tag : ${IMAGE_TAG}
-             Check console output for details
+             Check logs above for details
             ============================================
             """
         }
         always {
-            echo 'Pipeline completed. Cleaning workspace.'
+            echo 'Pipeline finished.'
         }
     }
 }
