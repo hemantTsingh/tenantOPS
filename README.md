@@ -217,7 +217,7 @@ docker compose logs -f
 | API | http://localhost:4000 |
 | API Health | http://localhost:4000/health |
 
-> Default login: `admin@tenantops.io` / `admin123` — **change immediately!**
+> Configure your credentials in `services/tenant-api/.env` before first login.
 
 ---
 
@@ -404,20 +404,6 @@ TENANTOPS_API=http://localhost:4000
 COLLECTION_INTERVAL=60
 SERVER_NAME=my-server
 ```
-
----
-
-## 💰 AWS Cost Estimate
-
-| Resource | Monthly Cost |
-|----------|-------------|
-| EKS Control Plane | ~$72 |
-| 2x t3.medium EC2 | ~$60 |
-| 4x Load Balancers | ~$64 |
-| EBS Volumes | ~$10 |
-| **Total** | **~$206/month** |
-
-> 💡 Use `terraform destroy` when not needed. Full rebuild in ~20 minutes with `terraform apply` + ArgoCD sync.
 
 ---
 
