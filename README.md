@@ -10,7 +10,7 @@
 ![Jenkins](https://img.shields.io/badge/Jenkins-CI%2FCD-D24939?style=for-the-badge&logo=jenkins)
 ![ArgoCD](https://img.shields.io/badge/ArgoCD-GitOps-EF7B4D?style=for-the-badge&logo=argo)
 
-**A production-grade DevOps portfolio project — B2B Infrastructure Monitoring with complete CI/CD on AWS EKS**
+**A production-grade DevOps portfolio project — B2B Infrastructure Monitoring Platform with complete CI/CD pipeline on AWS EKS**
 
 [Quick Start](#-quick-start) · [Architecture](#-architecture) · [CI/CD Pipeline](#-cicd-pipeline) · [Deploy to AWS](#-deploy-to-aws) · [Agent Setup](#-agent-setup)
 
@@ -20,7 +20,9 @@
 
 ## 📌 What is TenantOPS?
 
-TenantOPS is a **mini-Datadog** for B2B companies — monitor servers, services, metrics, and alerts from a single glass-pane dashboard.
+TenantOPS is a **B2B SaaS infrastructure monitoring platform** that gives engineering teams complete visibility into their servers, services, and infrastructure — all from a single unified dashboard.
+
+Think of it as your own self-hosted infrastructure intelligence layer: real-time metrics, agent-based collection, multi-tenant isolation, alerting, and log aggregation — built and deployed using a fully automated DevOps pipeline.
 
 | Category | Technologies |
 |----------|-------------|
@@ -37,10 +39,10 @@ TenantOPS is a **mini-Datadog** for B2B companies — monitor servers, services,
 
 ## ✨ Features
 
-- 🖥️ **Real-time server monitoring** — CPU, RAM, Disk, Network
+- 🖥️ **Real-time server monitoring** — CPU, RAM, Disk, Network per server
 - 🏢 **Multi-tenant architecture** — each client fully isolated
 - 🤖 **Agent-based collection** — one-liner install on any Linux server
-- 🔔 **Alert rules engine** — rules targeting specific servers/services
+- 🔔 **Alert rules engine** — custom rules targeting specific servers/services
 - 📊 **Time-series metrics** — charts with date/time range filter
 - 📋 **Integrated log viewer** — system logs, Docker logs, SSH logs
 - 🌙 **Dark/Light mode** — glass-morphism UI
@@ -48,44 +50,98 @@ TenantOPS is a **mini-Datadog** for B2B companies — monitor servers, services,
 
 ---
 
+## 📸 Screenshots
+
+### Application
+
+![TenantOPS Login](docs/screenshots/Project-UI.png)
+*TenantOPS — live on AWS EKS via Elastic Load Balancer*
+
+![TenantOPS Dashboard](docs/screenshots/working_image.png)
+*Main dashboard — real-time infrastructure overview with service health*
+
+### Infrastructure
+
+![Terraform Apply](docs/screenshots/Terraform-EKS.png)
+*Terraform apply complete — EKS cluster and VPC outputs*
+
+![EKS Console](docs/screenshots/EKS.png)
+*AWS EKS Console — tenantops-cluster Active (Kubernetes 1.30)*
+
+![EKS Nodes Up](docs/screenshots/EKS-cluster-up.png)
+*kubectl get nodes — 2 worker nodes Ready after terraform apply*
+
+![VPC](docs/screenshots/VPCs.png)
+*AWS VPC — tenantops-production-vpc created by Terraform*
+
+![S3 Buckets](docs/screenshots/S3.png)
+*S3 — Terraform state bucket and assets bucket*
+
+### Kubernetes
+
+![Running Pods](docs/screenshots/running_pods.png)
+*kubectl get pods — all services Running in tenantops namespace*
+
+![EBS CSI Driver](docs/screenshots/ebs-csi-controller.png)
+*EBS CSI driver — controller and node pods Running in kube-system*
+
+### GitOps — ArgoCD
+
+![ArgoCD Apps](docs/screenshots/ArgoCD.png)
+*ArgoCD — tenantops application Healthy and Synced to main branch*
+
+![ArgoCD Tree](docs/screenshots/argocd2.png)
+*ArgoCD resource tree — all 24 resources Healthy*
+
+### Observability — Grafana
+
+![Grafana](docs/screenshots/grafana-ui.png)
+*Grafana — Kubernetes dashboards auto-provisioned by kube-prometheus-stack*
+
+### CI/CD — Jenkins
+
+![Jenkins Pipeline](docs/screenshots/jenkins_final.png)
+*Jenkins pipeline — Build #11 ALL STAGES GREEN ✅*
+
+---
+
 ## 🏗️ Architecture
 
 ### Application Stack
 
-```
-Internet
-    │
-    ▼
-AWS ELB (LoadBalancer)
-    │
-    ▼
-Kubernetes EKS Cluster
-    ├── [frontend]   React + nginx      (x2 pods)
-    ├── [api]        Node.js/Express    (x2 pods)
-    ├── [collector]  Python + psutil    (x1 pod)
-    ├── [db]         PostgreSQL + EBS   (x1 pod)
-    ├── [argocd]     GitOps controller
-    ├── [jenkins]    CI/CD engine
-    └── [monitoring] Prometheus + Grafana
-         ▲           ▲
-    [Agent]       [Agent]
-   server-1      server-2
+```mermaid
+graph TD
+    Internet --> ELB[AWS ELB LoadBalancer]
+    ELB --> FE[Frontend\nReact + nginx\nx2 pods]
+    FE --> API[API\nNode.js Express\nx2 pods]
+    API --> DB[(PostgreSQL\nEBS Volume)]
+    API --> COL[Collector\nPython\nx1 pod]
+    subgraph EKS[EKS Cluster - ap-south-1]
+        FE
+        API
+        DB
+        COL
+        ARGO[ArgoCD\nGitOps]
+        JEN[Jenkins\nCI/CD]
+        PROM[Prometheus + Grafana]
+    end
+    A1[Agent - server-1] -->|metrics| API
+    A2[Agent - server-2] -->|metrics| API
+    GH[GitHub] -->|auto-sync| ARGO
 ```
 
 ### AWS Infrastructure
 
-```
-AWS ap-south-1
-├── VPC
-│   ├── Subnet ap-south-1a
-│   └── Subnet ap-south-1b
-├── EKS Cluster (k8s 1.29)
-│   ├── Node 1 — t3.medium (1a)
-│   └── Node 2 — t3.medium (1b)
-├── EBS Volumes (PostgreSQL + Jenkins)
-├── 4x ELB (frontend, jenkins, argocd, grafana)
-├── S3 Bucket (Terraform state)
-└── Secrets Manager (DB credentials)
+```mermaid
+graph TD
+    AWS[AWS ap-south-1] --> VPC
+    VPC --> SN1[Subnet ap-south-1a]
+    VPC --> SN2[Subnet ap-south-1b]
+    SN1 --> NODE1[EKS Node 1\nt3.medium]
+    SN2 --> NODE2[EKS Node 2\nt3.medium]
+    AWS --> S3[S3 Bucket\nTerraform State]
+    AWS --> SM[Secrets Manager\nDB Credentials]
+    AWS --> EBS[EBS Volumes\nPostgreSQL + Jenkins]
 ```
 
 ### Kubernetes Namespaces
@@ -101,34 +157,26 @@ AWS ap-south-1
 
 ## 🔄 CI/CD Pipeline
 
-```
-git push → GitHub (main)
-    │
-    ▼
-Jenkins (running on EKS)
-    ├── Stage 1: Checkout
-    │     └── IMAGE_TAG = v{BUILD}-{git_commit}
-    │
-    ├── Stage 2: Build Images (parallel)
-    │     ├── kaniko-frontend   ~4 min
-    │     ├── kaniko-api        ~40s
-    │     └── kaniko-collector  ~35s
-    │
-    ├── Stage 3: Security Scan (Trivy)
-    │     └── Scan all 3 images — HIGH/CRITICAL CVEs
-    │
-    ├── Stage 4: Deploy to EKS
-    │     └── helm upgrade --atomic (auto-rollback on fail)
-    │
-    └── Stage 5: Verify
-          └── helm status + history
-                │
-                ▼
-          ArgoCD auto-sync
+```mermaid
+graph LR
+    DEV[Developer] -->|git push| GH[GitHub main]
+    GH -->|trigger| JEN[Jenkins on EKS]
+    JEN --> CH[Stage 1\nCheckout\nIMAGE_TAG=vN-commit]
+    CH --> BUILD[Stage 2\nBuild Parallel]
+    BUILD --> KF[kaniko-frontend\n~4 min]
+    BUILD --> KA[kaniko-api\n~40s]
+    BUILD --> KC[kaniko-collector\n~35s]
+    KF --> DH[DockerHub]
+    KA --> DH
+    KC --> DH
+    DH --> SCAN[Stage 3\nTrivy Security Scan]
+    SCAN --> DEPLOY[Stage 4\nHelm Deploy\n--atomic]
+    DEPLOY --> VERIFY[Stage 5\nVerify\nhelm status]
+    VERIFY --> ARGO[ArgoCD\nAuto-sync]
 ```
 
-> **Why Kaniko?** EKS uses containerd — no Docker socket available.
-> Kaniko builds OCI images inside K8s pods without a Docker daemon.
+> **Why Kaniko?** EKS uses containerd runtime — no Docker socket available.
+> Kaniko builds OCI-compliant images inside Kubernetes pods without needing a Docker daemon.
 
 ---
 
@@ -175,7 +223,7 @@ docker compose logs -f
 
 ## 🤖 Agent Setup
 
-Install on any Linux server with one command:
+Install the TenantOPS agent on any Linux server with a single command:
 
 ```bash
 SERVER_NAME="my-server" \
@@ -184,15 +232,16 @@ curl -s http://YOUR_SERVER_IP:4000/api/agent/install | sudo bash
 ```
 
 The agent:
-- Installs in isolated venv at `/opt/tenantops-agent/`
-- Runs as systemd service: `tenantops-agent`
+- Installs in an isolated Python venv at `/opt/tenantops-agent/`
+- Runs as a systemd service: `tenantops-agent`
+- Auto-starts on reboot
 - Collects: CPU, RAM, Disk, Network, Processes, Docker containers, System logs
 
 ```bash
 # Check status
 sudo systemctl status tenantops-agent
 
-# View logs
+# View live logs
 sudo journalctl -u tenantops-agent -f
 
 # Restart
@@ -206,20 +255,22 @@ sudo systemctl restart tenantops-agent
 ### Prerequisites
 
 - AWS CLI configured (`aws configure`)
-- Terraform >= 1.5, kubectl, Helm >= 3.12
+- Terraform >= 1.5
+- kubectl
+- Helm >= 3.12
 
 ### Step 1 — Infrastructure (Terraform)
 
 ```bash
 cd terraform
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars with your AWS account details
+# Edit terraform.tfvars with your AWS details
 terraform init
 terraform plan
 terraform apply
 ```
 
-Creates: VPC, EKS cluster (2x t3.medium), IAM roles, EBS CSI driver, S3 state bucket.
+Creates: VPC (2 AZs), EKS cluster (2x t3.medium), IAM roles, EBS CSI driver, S3 state bucket, Secrets Manager entry.
 
 ### Step 2 — Configure kubectl
 
@@ -228,7 +279,7 @@ aws eks update-kubeconfig --name tenantops-cluster --region YOUR_REGION
 kubectl get nodes
 ```
 
-### Step 3 — Deploy Application
+### Step 3 — Deploy Application (Helm)
 
 ```bash
 helm upgrade --install tenantops ./helm/tenant-stack \
@@ -272,14 +323,14 @@ helm upgrade --install jenkins jenkins/jenkins \
   --set controller.admin.password=YOUR_SECURE_PASSWORD \
   --set persistence.enabled=true
 
-# DockerHub secret for kaniko builds
+# DockerHub secret for kaniko image builds
 kubectl create secret docker-registry dockerhub-secret \
   --docker-server=https://index.docker.io/v1/ \
   --docker-username=YOUR_DOCKERHUB_USERNAME \
   --docker-password=YOUR_DOCKERHUB_PAT \
   --namespace=jenkins
 
-# Jenkins cluster permissions
+# Grant Jenkins cluster permissions
 kubectl create clusterrolebinding jenkins-deploy \
   --clusterrole=cluster-admin \
   --serviceaccount=jenkins:jenkins
@@ -289,9 +340,9 @@ kubectl create clusterrolebinding jenkins-deploy \
 
 1. Jenkins UI → **New Item** → **Pipeline**
 2. Pipeline script from SCM → Git
-3. Repository URL: `https://github.com/YOUR_USERNAME/tenantOPS`
+3. Repository: `https://github.com/YOUR_USERNAME/tenantOPS`
 4. Branch: `*/main` — Script Path: `Jenkinsfile`
-5. Add DockerHub credentials with ID: `dockerhub-credentials`
+5. Add DockerHub credentials (ID: `dockerhub-credentials`)
 
 ---
 
@@ -304,15 +355,15 @@ tenantOPS/
 │   │   ├── src/
 │   │   ├── nginx.conf
 │   │   └── Dockerfile       # Multi-stage build
-│   ├── tenant-api/          # Node.js Express
+│   ├── tenant-api/          # Node.js Express REST API
 │   │   ├── src/routes/      # auth, agent, alerts, metrics
 │   │   ├── .env.example
 │   │   └── Dockerfile
-│   └── metrics-collector/   # Python + psutil
+│   └── metrics-collector/   # Python + psutil agent collector
 │       ├── src/
 │       ├── .env.example
 │       └── Dockerfile
-├── helm/tenant-stack/       # Helm chart
+├── helm/tenant-stack/       # Helm chart for all services
 │   ├── Chart.yaml
 │   ├── values.yaml
 │   └── templates/
@@ -322,20 +373,18 @@ tenantOPS/
 │   ├── modules/iam/
 │   └── terraform.tfvars.example
 ├── k8s/
-│   └── argocd-app.yaml
+│   └── argocd-app.yaml      # ArgoCD Application manifest
+├── docs/
+│   └── screenshots/         # Project screenshots
 ├── Jenkinsfile              # CI/CD pipeline definition
-├── docker-compose.yml       # Local development
-└── docs/
-    ├── ARCHITECTURE.md
-    ├── DEPLOYMENT.md
-    └── AGENT.md
+└── docker-compose.yml       # Local development
 ```
 
 ---
 
 ## 🔧 Environment Variables
 
-### API Service (`services/tenant-api/.env`)
+### API (`services/tenant-api/.env`)
 
 ```env
 DB_HOST=localhost
@@ -348,7 +397,7 @@ PORT=4000
 NODE_ENV=development
 ```
 
-### Collector Service (`services/metrics-collector/.env`)
+### Collector (`services/metrics-collector/.env`)
 
 ```env
 TENANTOPS_API=http://localhost:4000
@@ -368,7 +417,7 @@ SERVER_NAME=my-server
 | EBS Volumes | ~$10 |
 | **Total** | **~$206/month** |
 
-> 💡 Use `terraform destroy` when not needed. Full rebuild takes ~20 minutes.
+> 💡 Use `terraform destroy` when not needed. Full rebuild in ~20 minutes with `terraform apply` + ArgoCD sync.
 
 ---
 
@@ -389,8 +438,7 @@ SERVER_NAME=my-server
 kubectl describe pod <name> -n tenantops
 kubectl logs <name> -n tenantops --previous
 
-# DB connection failed
-# Ensure env var is DB_PASSWORD (not DB_PASS)
+# DB connection failed — ensure DB_PASSWORD env var (not DB_PASS)
 kubectl exec -it <api-pod> -n tenantops -- env | grep DB
 
 # EBS PVC stuck Pending — check EBS CSI driver
@@ -416,16 +464,6 @@ sudo journalctl -u tenantops-agent -f
 3. Commit: `git commit -m 'feat: add my feature'`
 4. Push: `git push origin feature/my-feature`
 5. Open a Pull Request
-
----
-
-## 📚 Documentation
-
-| Doc | Description |
-|-----|-------------|
-| [Architecture](docs/ARCHITECTURE.md) | Detailed system design and data flow |
-| [Deployment](docs/DEPLOYMENT.md) | Step-by-step AWS deployment guide |
-| [Agent](docs/AGENT.md) | Agent installation and configuration |
 
 ---
 
